@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>버닝엉클 | 강원도 로컬 웰니스 생태계 플랫폼</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+    
+    <style>
+        /* 토스뱅크 & 구글 하이브리드 미니멀리즘 디자인 시스템 */
+        :root {
+            --toss-blue: #3182f6;
+            --toss-dark: #191f28;
+            --toss-sub: #4e5968;
+            --toss-muted: #8b95a1;
+            --toss-bg: #f9fafb;
+            --toss-surface: #ffffff;
+            
+            --wellness-green: #00c73c;
+            --wellness-bg: #e8f8f0;
+            --error-red: #f04452;
+            --error-bg: #fff0f1;
+
+            --radius-card: 24px;
+            --radius-btn: 16px;
+            --radius-full: 9999px;
+            
+            --shadow-subtle: 0 4px 16px rgba(0, 0, 0, 0.02);
+            --shadow-premium: 0 12px 40px rgba(2, 9, 19, 0.04);
+            --shadow-float: 0 24px 64px rgba(49, 130, 246, 0.08);
+
+            --bezier: cubic-bezier(0.16, 1, 0.3, 1);
+            --speed: 0.5s;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Pretendard', -apple-system, sans-serif;
+            letter-spacing: -0.04em;
+        }
+
+        body {
+            background-color: var(--toss-bg);
+            color: var(--toss-dark);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        /* Ambient Light Background Decor (토스 스타일 그라디언트 빔) */
+        .ambient-beam-1 {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(49, 130, 246, 0.06) 0%, rgba(255,255,255,0) 70%);
+            top: -200px;
+            right: -100px;
+            z-index: -1;
+        }
+        .ambient-beam-2 {
+            position: absolute;
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, rgba(0, 199, 60, 0.04) 0%, rgba(255,255,255,0) 70%);
+            top: 800px;
+            left: -200px;
+            z-index: -1;
+        }
+
+        /* GNB Header */
+        .gnb {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 76px;
+            background-color: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 60px;
+            z-index: 2000;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+        }
+
+        .gnb-logo {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--toss-dark);
+            text-decoration: none;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        .gnb-logo span {
+            color: var(--toss-blue);
+        }
+
+        .gnb-right-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 40px;
+        }
+
+        .gnb-menu {
+            display: flex;
+            gap: 40px;
+            list-style: none;
+        }
+
+        .gnb-menu a {
+            text-decoration: none;
+            color: var(--toss-sub);
+            font-size: 16px;
+            font-weight: 600;
+            transition: color var(--speed) var(--bezier);
+        }
+
+        .gnb-menu a:hover {
+            color: var(--toss-blue);
+        }
+
+        .gnb-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background-color: rgba(49, 130, 246, 0.08);
+            color: var(--toss-blue);
+            padding: 10px 18px;
+            border-radius: var(--radius-btn);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+            transition: var(--bezier) var(--speed);
+        }
+
+        .gnb-btn:hover {
+            background-color: var(--toss-blue);
+            color: #ffffff;
+        }
+
+        /* Hero Layout */
+        .hero {
+            position: relative;
+            padding: 180px 60px 100px;
+            max-width: 1320px;
+            margin: 0 auto;
+        }
+
+        .hero-layout {
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+        }
+
+        .hero-cell-text {
+            display: table-cell;
+            vertical-align: middle;
+            width: 55%;
+            padding-right: 60px;
+        }
+
+        .hero-cell-img {
+            display: table-cell;
+            vertical-align: middle;
+            width: 45%;
+        }
+
+        .badge-premium {
+            display: inline-flex;
+            align-items: center;
+            background-color: #ffffff;
+            color: var(--toss-blue);
+            padding: 8px 18px;
+            border-radius: var(--radius-full);
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 28px;
+            box-shadow: var(--shadow-subtle);
+            border: 1px solid rgba(49, 130, 246, 0.1);
+        }
+
+        .hero h1 {
+            font-size: 54px;
+            line-height: 1.25;
+            font-weight: 900;
+            color: var(--toss-dark);
+            margin-bottom: 28px;
+        }
+
+        .hero p.lead {
+            font-size: 20px;
+            color: var(--toss-sub);
+            line-height: 1.65;
+            margin-bottom: 44px;
+            font-weight: 400;
+        }
+
+        /* Toss Premium Button System */
+        .btn-prime {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background-color: var(--toss-blue);
+            color: #ffffff;
+            padding: 18px 36px;
+            border-radius: var(--radius-btn);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 18px;
+            transition: var(--bezier) var(--speed);
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 8px 24px rgba(49, 130, 246, 0.15);
+        }
+
+        .btn-prime:hover {
+            background-color: #1b64da;
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-float);
+        }
+
+        .hero-frame {
+            border-radius: var(--radius-card);
+            overflow: hidden;
+            box-shadow: var(--shadow-premium);
+            height: 520px;
+            background-color: #eee;
+        }
+
+        .hero-frame img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Premium Section Common */
+        section.section-block {
+            padding: 140px 60px;
+            max-width: 1320px;
+            margin: 0 auto;
+        }
+
+        .section-header {
+            max-width: 800px;
+            margin-bottom: 80px;
+        }
+
+        .section-header .tag {
+            color: var(--toss-blue);
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 14px;
+            display: block;
+            text-transform: uppercase;
+        }
+
+        .section-header h2 {
+            font-size: 40px;
+            color: var(--toss-dark);
+            font-weight: 800;
+            line-height: 1.35;
+        }
+
+        .section-header p {
+            font-size: 18px;
+            color: var(--toss-sub);
+            margin-top: 16px;
+        }
+
+        /* Grid Layout Framework (6대 핵심 서비스) */
+        .grid-box {
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: separate;
+            border-spacing: 28px;
+            margin: -28px;
+        }
+
+        .grid-row {
+            display: table-row;
+        }
+
+        .grid-cell {
+            display: table-cell;
+            background-color: var(--toss-surface);
+            border-radius: var(--radius-card);
+            padding: 44px;
+            vertical-align: top;
+            box-shadow: var(--shadow-subtle);
+            transition: var(--bezier) var(--speed);
+        }
+
+        .grid-cell:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--shadow-premium);
+        }
+
+        .grid-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 60px;
+            height: 60px;
+            background-color: #f2f4f6;
+            color: var(--toss-dark);
+            border-radius: var(--radius-btn);
+            margin-bottom: 32px;
+        }
+
+        .grid-cell h3 {
+            font-size: 22px;
+            margin-bottom: 16px;
+            font-weight: 700;
+        }
+
+        .grid-cell p {
+            color: var(--toss-sub);
+            font-size: 16px;
+            line-height: 1.65;
+        }
+
+        /* Dynamic Evolution Path Component (As-Is vs To-Be) */
+        .evolve-container {
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: separate;
+            border-spacing: 32px 0;
+        }
+
+        .evolve-card {
+            display: table-cell;
+            background-color: var(--toss-surface);
+            border-radius: var(--radius-card);
+            padding: 56px;
+            vertical-align: top;
+            box-shadow: var(--shadow-subtle);
+        }
+
+        .evolve-card.highlight {
+            background-color: var(--toss-dark);
+            color: #ffffff;
+            box-shadow: var(--shadow-premium);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: var(--radius-full);
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 28px;
+        }
+
+        .status-asis { background-color: #f2f4f6; color: var(--toss-sub); }
+        .status-tobe { background-color: var(--toss-blue); color: #ffffff; }
+
+        .evolve-card h3 {
+            font-size: 30px;
+            margin-bottom: 36px;
+            font-weight: 800;
+        }
+
+        .stack-list { list-style: none; }
+        .stack-list li {
+            position: relative;
+            padding-left: 36px;
+            margin-bottom: 32px;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .stack-list li .material-icons-outlined {
+            position: absolute;
+            left: 0;
+            top: 2px;
+            font-size: 24px;
+        }
+
+        .evolve-card.highlight .stack-list li { color: rgba(255,255,255,0.75); }
+        .evolve-card.highlight .stack-list li strong { color: #ffffff; }
+
+        .stack-list li strong {
+            display: block;
+            font-size: 18px;
+            color: var(--toss-dark);
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
+
+        /* Split Section Layout (Pain vs Solution) */
+        .split-box {
+            display: table;
+            width: 100%;
+            table-layout: fixed;
+            border-collapse: separate;
+            border-spacing: 56px 0;
+            margin-bottom: 60px;
+        }
+
+        .split-cell {
+            display: table-cell;
+            vertical-align: middle;
+            width: 50%;
+        }
+
+        .content-frame {
+            border-radius: var(--radius-card);
+            overflow: hidden;
+            box-shadow: var(--shadow-premium);
+            height: 480px;
+        }
+
+        .content-frame img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Semantic List Templates */
+        .card-list { list-style: none; }
+        .card-item {
+            display: table;
+            width: 100%;
+            padding: 28px;
+            border-radius: var(--radius-btn);
+            margin-bottom: 20px;
+            box-shadow: var(--shadow-subtle);
+            background-color: var(--toss-surface);
+        }
+        .card-item.danger-tint { background-color: var(--error-bg); }
+        .card-item.success-tint { background-color: var(--wellness-bg); }
+
+        .card-icon-cell {
+            display: table-cell;
+            vertical-align: middle;
+            width: 52px;
+            font-size: 26px;
+        }
+        .card-item.danger-tint .card-icon-cell { color: var(--error-red); }
+        .card-item.success-tint .card-icon-cell { color: var(--wellness-green); }
+
+        .card-text-cell {
+            display: table-cell;
+            vertical-align: middle;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--toss-dark);
+            line-height: 1.5;
+        }
+
+        .card-text-cell strong {
+            display: block;
+            font-size: 17px;
+            margin-bottom: 2px;
+            color: var(--toss-dark);
+        }
+
+        /* Massive Call To Action Block */
+        .cta-banner {
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+            color: #ffffff;
+            border-radius: 32px;
+            padding: 90px 60px;
+            text-align: center;
+            max-width: 1200px;
+            margin: 80px auto 140px;
+            box-shadow: var(--shadow-premium);
+        }
+
+        .cta-banner h2 {
+            font-size: 42px;
+            font-weight: 900;
+            margin-bottom: 24px;
+            line-height: 1.3;
+        }
+
+        .cta-banner p {
+            font-size: 19px;
+            color: rgba(255,255,255,0.7);
+            margin-bottom: 44px;
+            max-width: 680px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.65;
+        }
+
+        /* Footer System */
+        footer {
+            background-color: #ffffff;
+            padding: 80px 60px;
+            border-top: 1px solid #e5e8eb;
+            font-size: 14px;
+            color: var(--toss-sub);
+        }
+
+        .footer-logo {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--toss-dark);
+            margin-bottom: 20px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        .footer-logo span { color: var(--toss-blue); }
+
+        /* Perfect Mobile Responsive Layout */
+        @media (max-width: 900px) {
+            .gnb { padding: 0 24px; }
+            .gnb-menu { display: none; }
+            .hero { padding: 140px 24px 60px; }
+            .hero-layout, .hero-cell-text, .hero-cell-img, .grid-box, .grid-row, .grid-cell, .evolve-container, .evolve-card, .split-box, .split-cell {
+                display: block;
+                width: 100% !important;
+                padding-right: 0;
+                border-spacing: 0;
+            }
+            .hero-cell-text { margin-bottom: 40px; }
+            .hero h1 { font-size: 36px; }
+            .grid-cell, .evolve-card, .split-cell {
+                margin-bottom: 24px;
+                padding: 32px;
+            }
+            .content-frame, .hero-frame { height: 280px; margin-bottom: 24px; }
+            section.section-block { padding: 80px 24px; }
+            .section-header h2 { font-size: 28px; }
+            .cta-banner { padding: 60px 24px; }
+            .cta-banner h2 { font-size: 28px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ambient-beam-1"></div>
+    <div class="ambient-beam-2"></div>
+
+    <header class="gnb">
+        <a href="#" class="gnb-logo">burning uncle<span>.</span></a>
+        <div class="gnb-right-wrapper">
+            <ul class="gnb-menu">
+                <li><a href="#solutions">6대 핵심역량</a></li>
+                <li><a href="#evolution">플랫폼 전환</a></li>
+                <li><a href="#painpoint">가치제안</a></li>
+                <li><a href="#revenue">수익모델</a></li>
+            </ul>
+            <a href="tel:02-1234-5678" class="gnb-btn">
+                <span class="material-icons-outlined" style="font-size: 16px;">call</span>
+                <span>간편 전화</span>
+            </a>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div class="hero-layout">
+            <div class="hero-cell-text">
+                <span class="badge-premium">강원 테크 로컬웰니스 얼라이언스 2026</span>
+                <h1>강원도의 대자연과<br>지능형 백오피스의 결합</h1>
+                <p class="lead">단순한 단발성 마을 대행에 머무르셨습니까? 버닝엉클은 강원도 전역 200여 개 치유농장 인프라를 API 레벨로 묶어, 유기적인 데이터 기반 웰니스 벨트 상품 구조로 대전환을 완수합니다.</p>
+                <a href="#evolution" class="btn-prime">
+                    <span>생태계 진화 로드맵 보기</span>
+                    <span class="material-icons-outlined">arrow_downward</span>
+                </a>
+            </div>
+            <div class="hero-cell-img">
+                <div class="hero-frame">
+                    <img src="https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1000&q=80" alt="Gangwon Premium Pine Forest">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="solutions" class="section-block">
+        <div class="section-header">
+            <span class="tag">Our Infrastructure</span>
+            <h2>통합 디지털 전환을 선도하는<br>6대 통합 백오피스 아키텍처</h2>
+            <p>마케팅 콘텐츠 빌드부터 하드웨어 시설 보수, 고도화된 정산 자동화 OS까지 빈틈없이 제공합니다.</p>
+        </div>
+        
+        <div class="grid-box">
+            <div class="grid-row">
+                <div class="grid-cell">
+                    <div class="grid-icon"><span class="material-icons-outlined">videocam</span></div>
+                    <h3>시네마틱 로컬 브랜딩</h3>
+                    <p>정선, 평창 고유의 공간 미학을 영화적 화각으로 담아내는 프리미엄 영상 크리에이티브. 타깃 지향형 마케팅 및 검색엔진 노출을 완벽하게 수행합니다.</p>
+                </div>
+                <div class="grid-cell">
+                    <div class="grid-icon"><span class="material-icons-outlined">travel_explore</span></div>
+                    <h3>체류형 웰니스 패키지</h3>
+                    <p>당일 관광에 그쳤던 한계를 타파하고 숙박, 파인다이닝, 테라피 프로그램을 올인원으로 관통시켜 관광객 체류 시간과 객단가를 300% 이상 증대합니다.</p>
+                </div>
+                <div class="grid-cell">
+                    <div class="grid-icon"><span class="material-icons-outlined">token</span></div>
+                    <h3>AI 백오피스 OS</h3>
+                    <p>디지털 소외 계층을 위해 영수증 사진 한 장으로 작동하는 자동 AI 정산 모듈, 실시간 마진 트래킹 대시보드 및 24시간 음성 대화형 CS 엔진 자동화 가동.</p>
+                </div>
+            </div>
+            <div class="grid-row">
+                <div class="grid-cell">
+                    <div class="grid-icon"><span class="material-icons-outlined">foundation</span></div>
+                    <h3>공간 특화 시설 유지보수</h3>
+                    <p>농가 환경의 디테일을 가장 잘 이해하는 전문 인력 풀의 시공 및 긴급 보수망 가동. 아동 안전 펜스 보강 및 공간 리뉴얼 케어로 높은 공간 신뢰도를 유지합니다.</p>
+                </div>
+                <div class="grid-cell">
+                    <div class="grid-icon"><span class="material-icons-outlined">psychology</span></div>
+                    <h3>전문 치유 인력 풀 공급</h3>
+                    <p>성수기 극심한 농촌 구인난을 방어하기 위해 산림치유지도사, 원예 교육 전문가, 체험 가이드를 필요한 타임라인에 실시간 매칭하는 유연한 인력 소싱 체계.</p>
+                </div>
+                <div class="grid-cell">
+                    <div class="grid-icon"><span class="material-icons-outlined">hub</span></div>
+                    <h3>광역 연계 얼라이언스</h3>
+                    <p>분절된 개별 점 조직 형태의 강원 농가를 하나의 트래블 패스로 묶어, 소비자가 인접 마을을 연쇄 이동하며 연속 소비하도록 유도하는 거대한 로컬 벨트.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="evolution" style="background-color: #f2f4f6; padding: 140px 60px;">
+        <div class="section-header">
+            <span class="tag">Strategic Pivot</span>
+            <h2>단일 아웃소싱 구조에서<br>지능형 플랫폼 허브로의 거대한 도약</h2>
+        </div>
+
+        <div class="evolve-container">
+            <div class="evolve-card">
+                <span class="status-badge status-asis">과거 및 현재 (As-Is)</span>
+                <h3>분절형 개별 대행 체계</h3>
+                <ul class="stack-list">
+                    <li>
+                        <span class="material-icons-outlined" style="color: var(--error-red);">cancel</span>
+                        <strong>단발성 계약 리스크</strong>마을의 긴급 요청 시점에만 파편적으로 제공되는 외주 마케팅 및 단순 인력 수급의 한계.
+                    </li>
+                    <li>
+                        <span class="material-icons-outlined" style="color: var(--error-red);">cancel</span>
+                        <strong>행정 지연 및 병목 현상</strong>마을별 수동 예약 장부 처리, 영수증 파편화로 인한 통합 정산의 불투명성과 마진 분석 불가능.
+                    </li>
+                </ul>
+            </div>
+
+            <div class="evolve-card highlight">
+                <span class="status-badge status-tobe">미래 플랫폼 (To-Be)</span>
+                <h3>데이터 중심 광역 생태계 Hub</h3>
+                <ul class="stack-list">
+                    <li>
+                        <span class="material-icons-outlined" style="color: var(--wellness-green);">check_circle</span>
+                        <strong>광역 벨트 연계 원스톱 패키지</strong>평창 숙박 ⮕ 횡성 웰니스 체험  ⮕  강릉 로컬푸드로 매끄럽게 흐르는 통합 락인 투어 패스 생태계 구현.
+                    </li>
+                    <li>
+                        <span class="material-icons-outlined" style="color: var(--wellness-green);">check_circle</span>
+                        <strong>예측 컨설팅 및 데이터 비즈니스</strong>플랫폼에 누적된 실시간 정산 및 수요 트렌드 빅데이터를 가공하여, 지자체 및 대기업에 가치 있는 분석 리포트 공급 가능.
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <section id="painpoint" class="section-block">
+        <div class="section-header">
+            <span class="tag">Value Proposition</span>
+            <h2>농촌 현장의 고질적인 한계를<br>실질적인 기술 아키텍처로 타파합니다</h2>
+        </div>
+
+        <div class="split-box">
+            <div class="split-cell">
+                <ul class="card-list">
+                    <li class="card-item danger-tint">
+                        <div class="card-icon-cell"><span class="material-icons-outlined">trending_down</span></div>
+                        <div class="card-text-cell">
+                            <strong>콘텐츠 유입 한계</strong>우수한 치유농장 인프라를 보유했으나 브랜드 포지셔닝 및 디지털 채널 확장성 전무
+                        </div>
+                    </li>
+                    <li class="card-item danger-tint">
+                        <div class="card-icon-cell"><span class="material-icons-outlined">assignment_late</span></div>
+                        <div class="card-text-cell">
+                            <strong>과도한 행정 부하</strong>수동 정산, 간헐적 CS 응대로 인한 운영 피로 누적으로 본업인 치유 퀄리티 저하 발생
+                        </div>
+                    </li>
+                    <li class="card-item danger-tint">
+                        <div class="card-icon-cell"><span class="material-icons-outlined">report_problem</span></div>
+                        <div class="card-text-cell">
+                            <strong>인프라 취약성</strong>도시 시공사의 농촌 특수성 무시 부실 마감 및 시즌별 전문 체험 강사 소싱의 불투명성
+                        </div>
+                    </li>
+                </ul>
+            </div>
+            <div class="split-cell">
+                <div class="content-frame">
+                    <img src="https://images.unsplash.com/photo-1542718610-a1d656d1884c?auto=format&fit=crop&w=800&q=80" alt="Premium Wellness Green Center">
+                </div>
+            </div>
+        </div>
+
+        <div class="split-box" style="margin-top: 48px;">
+            <div class="split-cell">
+                <div class="content-frame">
+                    <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80" alt="Tech Dashboard Platform">
+                </div>
+            </div>
+            <div class="split-cell">
+                <ul class="card-list">
+                    <li class="card-item success-tint">
+                        <div class="card-icon-cell"><span class="material-icons-outlined">auto_awesome</span></div>
+                        <div class="card-text-cell">
+                            <strong>시네마틱 감성 브랜딩</strong>로컬의 고유한 서사를 발굴하고 시각화하여 프리미엄 유입 트래픽을 선제적으로 락인
+                        </div>
+                    </li>
+                    <li class="card-item success-tint">
+                        <div class="card-icon-cell"><span class="material-icons-outlined">bolt</span></div>
+                        <div class="card-text-cell">
+                            <strong>백오피스 자동화 에코시스템</strong>AI 음성 기반 자동응답 처리 및 스마트 자동 정산 모듈을 통해 행정 업무량 90% 이상 절감
+                        </div>
+                    </li>
+                    <li class="card-item success-tint">
+                        <div class="card-icon-cell"><span class="material-icons-outlined">verified_user</span></div>
+                        <div class="card-text-cell">
+                            <strong>검증된 신뢰 인프라</strong>마을 공간 맞춤형 상시 유지보수 전담 조직 운영 및 신뢰도 높은 전문 강사 인력풀의 안정적 상시 공급
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <section id="revenue" style="background-color: #fafbfc; padding: 140px 60px; border-top: 1px solid rgba(0,0,0,0.03);">
+        <div class="section-header">
+            <span class="tag">Monetization Stream</span>
+            <h2>안정적인 구독 매출원과<br>생태계 거래 수수료의 비즈니스 결합</h2>
+            <p>단발성 외주 용역 매출의 구조적 한계를 완전히 극복한 버닝엉클만의 다각화된 3대 수익 구조입니다.</p>
+        </div>
+
+        <div class="grid-box">
+            <div class="grid-row">
+                <div class="grid-cell" style="box-shadow: var(--shadow-subtle);">
+                    <div class="grid-icon" style="color:var(--toss-blue); background-color: #e8f2ff;"><span class="material-icons-outlined">dns</span></div>
+                    <h3>B2B SaaS 솔루션 구독료</h3>
+                    <p>마을 특화 AI 정산 운영체제 및 경영 마진율 시각화 분석 대시보드 라이선스를 이용하는 파트너십 마을을 대상으로 안정적이고 고정적인 월간·연간 구독료(SaaS Subscription) 매출을 견인합니다.</p>
+                </div>
+                <div class="grid-cell" style="box-shadow: var(--shadow-subtle);">
+                    <div class="grid-icon" style="color:var(--wellness-green); background-color: var(--wellness-bg);"><span class="material-icons-outlined">verified</span></div>
+                    <h3>유지보수 케어 리테이너 멤버십</h3>
+                    <p>노후화된 농촌 인테리어 시설 정기 보수, 안전 펜스 정기 점검 혜택 및 치유 전문가 스케줄링 풀 우선 배치권을 연계한 프리미엄 연간 리테이너 회원 멤버십 매출을 공고화합니다.</p>
+                </div>
+                <div class="grid-cell" style="box-shadow: var(--shadow-subtle);">
+                    <div class="grid-icon" style="color:#ff9e0d; background-color: #fff6e6;"><span class="material-icons-outlined">payments</span></div>
+                    <h3>생태계 중개 및 거래 수수료</h3>
+                    <p>강원 웰니스 광역 투어 패스를 관통하는 여행 상품 통합 결제 시 발생하는 정률 거래 수수료 수익, 그리고 성수기 초단기 외부 전문가 인력 풀 매칭 지원 시 발생하는 인력 중개 정률 수수료 모델입니다.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="cta-banner">
+        <h2>로컬 비즈니스의 지속 가능한 생태계,<br>지금 버닝엉클 허브에 합류하세요</h2>
+        <p>파편화된 오프라인 농촌 인프라의 가치를 극대화하고 데이터 중심의 영리한 플랫폼 생태계로 함께 진화하십시오. 버닝엉클이 로컬 웰니스의 지능형 기술 기반 초석을 다지겠습니다.</p>
+        <a href="tel:02-1234-5678" class="btn-prime">
+            <span class="material-icons-outlined">call</span>
+            <span>제휴 및 파트너십 문의하기</span>
+        </a>
+    </div>
+
+    <footer>
+        <div class="footer-logo">BURNING UNCLE<span>.</span></div>
+        <p style="font-weight: 700; margin-bottom: 8px; color: var(--toss-dark);">주식회사 버닝엉클 | 로컬 웰니스 생태계 디지털 전환 전략 혁신 파트너</p>
+        <p style="color: var(--toss-muted); line-height: 1.6;">© 2026 BURNING UNCLE. All Rights Reserved. 본 랜딩페이지 시스템 아키텍처는 고해상도 반응형 그리드 유틸리티를 적용하여 설계되었으며, 기획서의 핵심 가치 제안 및 비즈니스 전환 고도화 로드맵 내용을 엄격히 반영합니다.</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const anchors = document.querySelectorAll('.gnb-menu a, .hero-cell-text a');
+            
+            anchors.forEach(anchor => {
+                anchor.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const targetSelector = anchor.getAttribute('href');
+                    if(targetSelector === '#') return;
+                    
+                    const targetNode = document.querySelector(targetSelector);
+                    if(targetNode) {
+                        window.scrollTo({
+                            top: targetNode.offsetTop - 76,
+                            behavior: 'smooth'
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
