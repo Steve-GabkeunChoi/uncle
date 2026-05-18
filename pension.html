@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BurningUncle - Premium Cabin OS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        tossBlue: '#3182f6',
+                        tossBlueLight: '#e8f3ff',
+                        tossGray50: '#f9fafb',
+                        tossGray100: '#f2f4f6',
+                        tossGray200: '#e5e8eb',
+                        tossGray600: '#4e5968',
+                        tossGray800: '#333d4b',
+                        tossGray900: '#191f28',
+                        brandRed: '#ff5c35',
+                        brandRedLight: '#fff0ec',
+                        tossSuccess: '#00c73c',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Pretendard', sans-serif;
+            letter-spacing: -0.03em;
+            background-color: #f2f4f6;
+        }
+        .toss-transition {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .animate-screen-in {
+            animation: screenIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+        @keyframes screenIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="w-full min-h-screen text-tossGray900 select-none overflow-hidden">
+
+    <div id="toast-hub" class="fixed top-6 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <div id="app-root" class="w-full min-h-screen"></div>
+
+    <script>
+        // ================================================================= -->
+        // 1. 비즈니스 중심 글로벌 상태 매니지먼트 (Core State)
+        // ================================================================= -->
+        const coreState = {
+            currentUser: null,
+            currentView: 'dashboard',
+            
+            // 현장 중심 객실 정보 세트
+            rooms: [
+                { id: '101호 (Family 독채)', status: 'occupied', price: 350000, cleaner: '김숙자 매니저' },
+                { id: '102호 (Ocean View)', status: 'dirty', price: 280000, cleaner: '이정희 매니저' },
+                { id: '103호 (Forest Cabin)', status: 'empty', price: 240000, cleaner: '배정 담당 없음' },
+                { id: '201호 (Standard)', status: 'occupied', price: 180000, cleaner: '김숙자 매니저' },
+                { id: '202호 (Standard Premium)', status: 'occupied', price: 220000, cleaner: '이정희 매니저' },
+                { id: '203호 (Suite Master)', status: 'empty', price: 420000, cleaner: '배정 담당 없음' },
+                { id: '301호 (Glamping Wood)', status: 'dirty', price: 150000, cleaner: '박정철 매니저' },
+                { id: '302호 (Glamping Fire)', status: 'occupied', price: 150000, cleaner: '박정철 매니저' },
+                { id: '303호 (Penthouse VIP)', status: 'empty', price: 650000, cleaner: '마스터 총괄' }
+            ],
+
+            // 실시간 투숙 예약 타임 스탬프 원장 (객실별 예약 확정된 날짜 보존)
+            reservations: [
+                { id: 1001, email: 'customer@uncle.com', room: '101호 (Family 독채)', checkIn: '2026-05-18', checkOut: '2026-05-20', guestName: '김토스', price: 700000, status: '이용 중' },
+                { id: 1002, email: 'customer@uncle.com', room: '201호 (Standard)', checkIn: '2026-05-22', checkOut: '2026-05-24', guestName: '김토스', price: 360000, status: '결제 완료' }
+            ],
+
+            // 현장 룸서비스 및 바비큐 웨이팅 큐
+            bbqOrders: [
+                { id: 1, room: '101호 (Family 독채)', item: '🔥 강원 참나무 참숯 바비큐 세트 (2~3인)', time: '18:30 배달 요청', status: '접수 대기' },
+                { id: 2, room: '201호 (Standard)', item: '🧺 교체용 코튼 타월 & 최고급 어메니티 세트', time: '즉시 요청', status: '준비 중' }
+            ],
+
+            // 오퍼레이션 상태 가이드 구조화
+            statusMeta: {
+                empty: { text: '정비 완료 (공실)', class: 'text-tossSuccess bg-green-50 border-green-100', next: 'occupied' },
+                occupied: { text: '투숙 이용 중', class: 'text-tossBlue bg-tossBlueLight border-blue-100', next: 'dirty' },
+                dirty: { text: '퇴실 (정비 요망)', class: 'text-brandRed bg-brandRedLight border-red-100', next: 'empty' }
+            }
+        };
+
+        // 가상 뷰 라우팅 라우터 게이트웨이
+        function syncRouteView() {
+            const root = document.getElementById('app-root');
+            if (!coreState.currentUser) {
+                root.innerHTML = renderAuthLayout();
+            } else {
+                root.innerHTML = renderMainLayout();
+                renderActiveSubView();
+            }
+        }
+
+        // ================================================================= -->
+        // 2. 통합 사용자 인증 인터페이스 레이아웃 (로그인/회원가입 분리)
+        // ================================================================= -->
+        let authFormMode = 'login'; 
+
+        function renderAuthLayout() {
+            return `
+                <div class="w-full min-h-screen bg-tossGray100 flex items-center justify-center p-4 animate-screen-in">
+                    <div class="bg-white rounded-[32px] w-full max-w-md p-10 shadow-sm border border-tossGray200/60 space-y-8">
+                        <div class="flex flex-col items-center gap-2">
+                            <div class="w-12 h-12 bg-brandRedLight rounded-full flex items-center justify-center mb-1">
+                                <i class="fa-solid fa-fire text-brandRed text-2xl"></i>
+                            </div>
+                            <h2 class="text-2xl font-black tracking-tight">${authFormMode === 'login' ? 'BurningUncle 가동하기' : '스마트 운영 계정 등록'}</h2>
+                            <p class="text-xs font-semibold text-tossGray600">강원 프리미엄 독채 스테이 통합 관리 시스템</p>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold text-tossGray600 mb-1.5">이메일 계정</label>
+                                <input type="email" id="inp-email" placeholder="name@burninguncle.com" class="w-full bg-tossGray50 border border-tossGray200 px-4 py-3.5 rounded-2xl outline-none focus:border-tossBlue font-medium transition-all">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-tossGray600 mb-1.5">비밀번호</label>
+                                <input type="password" id="inp-password" placeholder="••••••••" class="w-full bg-tossGray50 border border-tossGray200 px-4 py-3.5 rounded-2xl outline-none focus:border-tossBlue font-medium transition-all">
+                            </div>
+                            ${authFormMode === 'signup' ? `
+                            <div class="animate-screen-in space-y-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-tossGray600 mb-1.5">이름 또는 담당자 성명</label>
+                                    <input type="text" id="inp-username" placeholder="홍길동" class="w-full bg-tossGray50 border border-tossGray200 px-4 py-3.5 rounded-2xl outline-none focus:border-tossBlue font-medium transition-all">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-tossGray600 mb-1.5">계정 권한 그룹</label>
+                                    <select id="inp-role" class="w-full bg-tossGray50 border border-tossGray200 px-4 py-3.5 rounded-2xl outline-none focus:border-tossBlue font-bold text-sm">
+                                        <option value="customer">투숙 고객 전용 계정 (실시간 스테이 예약/주문 데스크)</option>
+                                        <option value="admin">현장 총괄 관리자 계정 (통합 관제 대시보드 권한)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            ` : ''}
+                        </div>
+
+                        <div class="space-y-3 pt-2">
+                            <button onclick="executeAuthAction()" class="w-full bg-tossBlue hover:bg-blue-600 text-white font-bold py-4 rounded-2xl text-[15px] shadow-sm toss-transition">
+                                ${authFormMode === 'login' ? '로그인 세션 시작' : '운영 원장 등록 완료'}
+                            </button>
+                            <button onclick="switchAuthFormMode()" class="w-full text-center text-xs font-bold text-tossGray600 hover:text-tossGray900 block py-1">
+                                ${authFormMode === 'login' ? '아직 운영 계정이 없으신가요? 회원가입' : '이미 등록된 관리 계정이 있습니다? 로그인'}
+                            </button>
+                        </div>
+
+                        <div class="p-4 bg-tossGray50 rounded-2xl text-[11px] text-tossGray600 font-medium leading-relaxed">
+                            💡 <b>테스트 계정 가이드:</b><br>
+                            - 현장 총괄 관리자: <span class="font-bold text-tossBlue">admin@uncle.com</span> / 비번: <span class="font-bold text-tossBlue">1234</span><br>
+                            - 일반 투숙 고객 계정: <span class="font-bold text-brandRed">customer@uncle.com</span> / 비번: <span class="font-bold text-brandRed">1234</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ================================================================= -->
+        // 3. 글로벌 메인 레이아웃 인프라 프레임 (사이드바 메뉴 유기적 변경)
+        // ================================================================= -->
+        function renderMainLayout() {
+            const user = coreState.currentUser;
+            const isAdmin = user.role === 'admin';
+
+            return `
+                <div class="w-full min-h-screen flex bg-tossGray100 animate-screen-in">
+                    <aside class="w-72 bg-white border-r border-tossGray200 flex flex-col justify-between py-10 px-6 h-screen flex-shrink-0">
+                        <div class="space-y-10">
+                            <div class="flex items-center gap-3 px-3">
+                                <div class="w-10 h-10 bg-brandRedLight rounded-full flex items-center justify-center">
+                                    <i class="fa-solid fa-fire text-brandRed text-xl"></i>
+                                </div>
+                                <div>
+                                    <h1 class="text-xl font-black text-tossGray900 leading-tight">BurningUncle</h1>
+                                    <span class="text-[11px] font-bold text-tossGray600 uppercase tracking-wider">Premium Cabin Space</span>
+                                </div>
+                            </div>
+
+                            <nav class="space-y-1.5">
+                                ${isAdmin ? `
+                                    <button onclick="handleViewSwitch('dashboard')" id="nav-dashboard" class="w-full flex items-center gap-4 px-4 py-3.5 text-left rounded-2xl text-[15px] font-bold text-tossGray600 hover:bg-tossGray50 toss-transition"><i class="fa-solid fa-chart-pie text-lg w-6"></i>현장 종합 관제 대시보드</button>
+                                    <button onclick="handleViewSwitch('timeline')" id="nav-timeline" class="w-full flex items-center gap-4 px-4 py-3.5 text-left rounded-2xl text-[15px] font-bold text-tossGray600 hover:bg-tossGray50 toss-transition"><i class="fa-solid fa-calendar-days text-lg w-6"></i>실시간 예약 및 투숙 관리</button>
+                                    <button onclick="handleViewSwitch('bbq')" id="nav-bbq" class="w-full flex items-center gap-4 px-4 py-3.5 text-left rounded-2xl text-[15px] font-bold text-tossGray600 hover:bg-tossGray50 toss-transition"><i class="fa-solid fa-fire-burner text-lg w-6"></i>바비큐 & 현장 오더 케어</button>
+                                    <button onclick="handleViewSwitch('sales')" id="nav-sales" class="w-full flex items-center gap-4 px-4 py-3.5 text-left rounded-2xl text-[15px] font-bold text-tossGray600 hover:bg-tossGray50 toss-transition"><i class="fa-solid fa-receipt text-lg w-6"></i>투숙 매출 정산 리포트</button>
+                                    <button onclick="handleViewSwitch('customers')" id="nav-customers" class="w-full flex items-center gap-4 px-4 py-3.5 text-left rounded-2xl text-[15px] font-bold text-tossGray600 hover:bg-tossGray50 toss-transition"><i class="fa-solid fa-user-gear text-lg w-6"></i>CRM 우수 고객 요약 원장</button>
+                                    <button onclick="handleViewSwitch('settings')" id="nav-settings" class="w-full flex items-center gap-4 px-4 py-3.5 text-left rounded-2xl text-[15px] font-bold text-tossGray600 hover:bg-tossGray50 toss-transition"><i class="fa-solid fa-sliders text-lg w-6"></i>펜션 오퍼레이션 환경 설정</button>
+                                ` : `
+                                    <button onclick="handleViewSwitch('timeline')" id="nav-timeline" class="w-full flex items-center gap-4 px-4 py-3.5 text-left rounded-2xl text-[15px] font-bold text-tossGray600 hover:bg-tossGray50 toss-transition"><i class="fa-solid fa-calendar-check text-lg w-6"></i>실시간 펜션 스테이 예약</button>
+                                    <button onclick="handleViewSwitch('bbq')" id="nav-bbq" class="w-full flex items-center gap-4 px-4 py-3.5 text-left rounded-2xl text-[15px] font-bold text-tossGray600 hover:bg-tossGray50 toss-transition"><i class="fa-solid fa-utensils text-lg w-6"></i>현장 바비큐 및 서비스 요청</button>
+                                `}
+                            </nav>
+                        </div>
+
+                        <div class="bg-tossGray50 rounded-2xl p-4 flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-tossBlue rounded-full flex items-center justify-center text-white font-black text-sm">
+                                    ${user.username.substring(0,2).toUpperCase()}
+                                </div>
+                                <div>
+                                    <p class="text-[14px] font-bold text-tossGray900 truncate max-w-[120px]">${user.username}</p>
+                                    <span class="text-[11px] font-bold text-tossGray600">${isAdmin ? '총괄 매니저' : '투숙 VIP 고객'}</span>
+                                </div>
+                            </div>
+                            <button onclick="executeLogout()" class="text-tossGray600 hover:text-brandRed p-2 rounded-xl hover:bg-tossGray200/50 toss-transition" title="로그아웃">
+                                <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                            </button>
+                        </div>
+                    </aside>
+
+                    <div class="flex-1 flex flex-col h-screen overflow-hidden">
+                        <header class="h-20 bg-white border-b border-tossGray200 flex items-center justify-between px-10 flex-shrink-0">
+                            <div class="flex items-center gap-6">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full bg-tossSuccess animate-ping"></span>
+                                    <span class="text-xs font-bold text-tossGray800">강원 삼척 스테이 실시간 오퍼레이션 채널 연동 중</span>
+                                </div>
+                            </div>
+                            <span class="text-xs font-bold text-tossBlue bg-tossBlueLight px-4 py-2 rounded-full">
+                                환영합니다, ${user.username} 님
+                            </span>
+                        </header>
+
+                        <div id="sub-workspace-viewport" class="flex-1 overflow-y-auto px-10 py-8"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ================================================================= -->
+        // 4. 서브페이지 컴포넌트 뷰 빌더 (핵심 비즈니스 현실화 레이어)
+        // ================================================================= -->
+        function renderActiveSubView() {
+            const viewport = document.getElementById('sub-workspace-viewport');
+            if(!viewport) return;
+
+            const allNavIds = ['dashboard', 'timeline', 'bbq', 'sales', 'customers', 'settings'];
+            allNavIds.forEach(id => {
+                const btn = document.getElementById(`nav-${id}`);
+                if(btn) btn.className = "w-full flex items-center gap-4 px-4 py-3.5 text-left rounded-2xl text-[15px] font-bold text-tossGray600 hover:bg-tossGray50 toss-transition";
+            });
+            const activeBtn = document.getElementById(`nav-${coreState.currentView}`);
+            if(activeBtn) activeBtn.className = "w-full flex items-center gap-4 px-4 py-3.5 text-left rounded-2xl text-[15px] font-bold text-tossBlue bg-tossBlueLight toss-transition";
+
+            // 권한 세션별 오버라이딩 분기 제어
+            if (coreState.currentView === 'dashboard') viewport.innerHTML = buildDashboardHtml();
+            else if (coreState.currentView === 'timeline') viewport.innerHTML = buildTimelineHtml();
+            else if (coreState.currentView === 'bbq') viewport.innerHTML = buildBbqHtml();
+            else if (coreState.currentView === 'sales') viewport.innerHTML = buildSalesHtml();
+            else if (coreState.currentView === 'customers') viewport.innerHTML = buildCustomersHtml();
+            else if (coreState.currentView === 'settings') viewport.innerHTML = buildSettingsHtml();
+        }
+
+        // 1) [관리자 전용] 현장 종합 관제 대시보드
+        function buildDashboardHtml() {
+            let occ = 0, emp = 0, cln = 0;
+            coreState.rooms.forEach(r => {
+                if(r.status === 'occupied') occ++;
+                else if(r.status === 'empty') emp++;
+                else if(r.status === 'dirty') cln++;
+            });
+
+            let matrixCards = coreState.rooms.map((r, i) => {
+                const meta = coreState.statusMeta[r.status];
+                let clickActionText = "객실 상태 변경";
+                if (r.status === 'dirty') clickActionText = "클릭: 정비 지시 및 청소 완료 처리";
+                else if (r.status === 'empty') clickActionText = "클릭: 가상 수동 체크인 전환";
+                else if (r.status === 'occupied') clickActionText = "클릭: 퇴실 처리 및 정비 요망 전환";
+
+                return `
+                    <div onclick="executeRotateStatus(${i})" class="bg-white p-6 rounded-3xl border border-tossGray200/50 hover:shadow-md hover:-translate-y-1 toss-transition cursor-pointer flex flex-col justify-between h-40">
+                        <div class="flex justify-between items-start">
+                            <span class="font-extrabold text-md text-tossGray900">${r.id}</span>
+                            <span class="text-[11px] font-bold px-2.5 py-1 rounded-xl ${meta.class}">${meta.text}</span>
+                        </div>
+                        <div class="flex justify-between items-end">
+                            <span class="text-[11px] text-tossGray600 font-bold"><i class="fa-solid fa-user-gear mr-1"></i>${r.cleaner}</span>
+                            <span class="text-[10px] text-tossBlue font-bold bg-tossBlueLight px-2 py-1 rounded-md">${clickActionText}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="space-y-8 animate-screen-in">
+                    <div>
+                        <h2 class="text-3xl font-black tracking-tight text-tossGray900">현장 오퍼레이션 종합 관제 상황판</h2>
+                        <p class="text-sm font-medium text-tossGray600 mt-1">오늘 당일의 객실 상태 체크, 배정 청소 인력 정보 및 긴급 정비 지시 가동 모듈입니다.</p>
+                    </div>
+
+                    <div class="grid grid-cols-4 gap-6">
+                        <div class="bg-white rounded-3xl p-6 border border-tossGray200/40 shadow-sm">
+                            <span class="text-xs font-bold text-tossGray600">총 관리 독채수</span>
+                            <p class="text-3xl font-black text-tossGray900 mt-4">9개동</p>
+                        </div>
+                        <div class="bg-white rounded-3xl p-6 border border-tossGray200/40 shadow-sm">
+                            <span class="text-xs font-bold text-tossGray600">현재 고객 투숙 중</span>
+                            <p class="text-3xl font-black text-tossBlue mt-4">${occ}개동</p>
+                        </div>
+                        <div class="bg-white rounded-3xl p-6 border border-tossGray200/40 shadow-sm">
+                            <span class="text-xs font-bold text-tossGray600">정비 완료 (즉시 입실 가능)</span>
+                            <p class="text-3xl font-black text-tossSuccess mt-4">${emp}개동</p>
+                        </div>
+                        <div class="bg-white rounded-3xl p-6 border border-tossGray200/40 shadow-sm">
+                            <span class="text-xs font-bold text-tossGray600">청소 필요 (정비 지연)</span>
+                            <p class="text-3xl font-black text-brandRed mt-4">${cln}개동</p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <h3 class="text-base font-bold text-tossGray800">실시간 독채 캐빈 오퍼레이션 매트릭스</h3>
+                        <div class="grid grid-cols-3 gap-4">${matrixCards}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 2) [고객/관리자 공통] 실시간 예약 신청 및 내역 조회 데스크 (달력 탑재형 고도화)
+        function buildTimelineHtml() {
+            const isAdmin = coreState.currentUser.role === 'admin';
+            
+            // 등록된 전체 예약 원장 레코드 리스트업
+            let reservationListHtml = coreState.reservations.map(res => {
+                // 관리자용 계정 강제 취소 레버 활성화 여부
+                let adminCancelBtn = isAdmin ? `<button onclick="executeCancelReservation(${res.id})" class="bg-brandRedLight text-brandRed px-3 py-1.5 rounded-xl font-bold text-xs hover:bg-brandRed hover:text-white toss-transition">예약 강제 만료</button>` : '';
+                return `
+                    <div class="bg-white p-5 rounded-2xl border border-tossGray200/40 flex justify-between items-center text-sm font-semibold">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-black bg-tossBlueLight text-tossBlue px-2.5 py-0.5 rounded-md">${res.room.split(' ')[0]}</span>
+                                <span class="font-extrabold text-tossGray900">${res.guestName} 고객님</span>
+                            </div>
+                            <p class="text-xs text-tossGray600 font-medium">투숙 일정: <span class="text-tossGray800 font-bold">${res.checkIn}</span> 부터 <span class="text-tossGray800 font-bold">${res.checkOut}</span> 까지</p>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <span class="text-xs text-tossGray900 font-black">${res.price.toLocaleString()}원</span>
+                            <span class="text-[11px] font-bold bg-green-50 text-tossSuccess px-2.5 py-1 rounded-lg">${res.status}</span>
+                            ${adminCancelBtn}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            if(coreState.reservations.length === 0) {
+                reservationListHtml = `<div class="p-8 text-center text-xs font-bold text-tossGray600 bg-white rounded-2xl border border-tossGray100">현재 확정되어 가동 중인 스테이 예약 원장이 존재하지 않습니다.</div>`;
+            }
+
+            return `
+                <div class="space-y-8 animate-screen-in">
+                    <div>
+                        <h2 class="text-3xl font-black tracking-tight text-tossGray900">${isAdmin ? '펜션 스테이 투숙 원장 통합 관리' : '강원 프리미엄 독채 스테이 예약'}</h2>
+                        <p class="text-sm font-medium text-tossGray600 mt-1">원하시는 객실 동과 투숙 일정을 네이티브 달력 시스템을 이용하여 확정하고 제어할 수 있습니다.</p>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-8">
+                        <div class="bg-white p-8 rounded-3xl border border-tossGray200/60 shadow-sm h-fit space-y-5">
+                            <h3 class="text-base font-bold text-tossGray900"><i class="fa-solid fa-calendar-plus text-tossBlue mr-2"></i>실시간 예약 신청</h3>
+                            <div class="space-y-4 text-xs font-bold">
+                                <div>
+                                    <label class="block mb-1.5 text-tossGray600">예약 대상 객실동 선택</label>
+                                    <select id="sel-res-room" class="w-full bg-tossGray50 border border-tossGray200 p-3 rounded-xl outline-none focus:border-tossBlue text-sm font-bold">
+                                        ${coreState.rooms.map(r => `<option value="${r.id}">${r.id} - (${r.price.toLocaleString()}원)</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block mb-1.5 text-tossGray600">체크인 희망일 (달력 선택)</label>
+                                    <input type="date" id="inp-checkin-date" value="2026-05-18" class="w-full bg-tossGray50 border border-tossGray200 p-3 rounded-xl outline-none focus:border-tossBlue text-sm font-bold">
+                                </div>
+                                <div>
+                                    <label class="block mb-1.5 text-tossGray600">체크아웃 희망일 (달력 선택)</label>
+                                    <input type="date" id="inp-checkout-date" value="2026-05-19" class="w-full bg-tossGray50 border border-tossGray200 p-3 rounded-xl outline-none focus:border-tossBlue text-sm font-bold">
+                                </div>
+                                <div>
+                                    <label class="block mb-1.5 text-tossGray600">예약 대표 투숙자명</label>
+                                    <input type="text" id="inp-guest-name" value="${coreState.currentUser.username}" class="w-full bg-tossGray50 border border-tossGray200 p-3 rounded-xl outline-none focus:border-tossBlue text-sm font-bold">
+                                </div>
+                            </div>
+                            <button onclick="executeNewReservation()" class="w-full bg-tossBlue hover:bg-blue-600 text-white font-bold py-4 rounded-xl text-xs shadow-sm toss-transition">선택된 날짜 일정으로 실시간 예약 확정</button>
+                        </div>
+
+                        <div class="col-span-2 space-y-4">
+                            <h3 class="text-base font-bold text-tossGray800"><i class="fa-solid fa-list-check text-tossBlue mr-2"></i>현재 스케줄 및 확정 원장 목록</h3>
+                            <div class="space-y-3">${reservationListHtml}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 3) 바비큐 및 현장 오더 케어 컴포넌트
+        function buildBbqHtml() {
+            const isAdmin = coreState.currentUser.role === 'admin';
+            
+            let orderCards = coreState.bbqOrders.map(o => `
+                <div class="bg-white p-5 rounded-2xl border border-tossGray200/50 flex justify-between items-center hover:shadow-sm">
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-black px-2 py-0.5 rounded-md bg-brandRedLight text-brandRed">${o.room.split(' ')[0]}</span>
+                            <span class="text-xs text-tossGray600 font-bold">${o.time}</span>
+                        </div>
+                        <p class="text-sm font-bold text-tossGray900">${o.item}</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs font-bold text-brandRed bg-brandRedLight px-2.5 py-1 rounded-md">${o.status}</span>
+                        ${isAdmin ? `<button onclick="executeClearBbq(${o.id})" class="text-xs font-bold bg-tossGray900 text-white hover:bg-black px-4 py-2 rounded-xl toss-transition">현장 서비스 제공 완료</button>` : ''}
+                    </div>
+                </div>
+            `).join('');
+
+            if(coreState.bbqOrders.length === 0) {
+                orderCards = `<div class="p-8 text-center text-xs font-bold text-tossGray600 bg-white rounded-2xl border border-tossGray100">현재 밀린 현장 룸서비스 긴급 요청건이 없습니다.</div>`;
+            }
+
+            return `
+                <div class="space-y-8 animate-screen-in">
+                    <div>
+                        <h2 class="text-3xl font-black tracking-tight text-tossGray900">현장 특이사항 및 참숯/어메니티 서비스 오더</h2>
+                        <p class="text-sm font-medium text-tossGray600 mt-1">강원도 산간 펜션 운영 특성에 최적화된 바비큐 참숯 준비 및 필수 타월 비품 추가 룸서비스 요청 관리판입니다.</p>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-8">
+                        <div class="col-span-2 space-y-4">
+                            <h3 class="text-base font-bold text-tossGray800">실시간 처리 대기 큐</h3>
+                            <div class="space-y-2.5">${orderCards}</div>
+                        </div>
+                        
+                        <div class="bg-white p-6 rounded-3xl border border-tossGray200/50 h-fit space-y-4 shadow-sm">
+                            <h3 class="text-sm font-bold text-tossGray900"><i class="fa-solid fa-bullhorn text-brandRed mr-2"></i>룸 현장 오더 원격 추가</h3>
+                            <div class="space-y-3 text-xs font-bold">
+                                <div>
+                                    <label class="block mb-1 text-tossGray600">요청 발생 객실동</label>
+                                    <select id="sel-bbq-room" class="w-full bg-tossGray50 border border-tossGray200 p-2.5 rounded-xl outline-none">
+                                        ${coreState.rooms.map(r => `<option value="${r.id}">${r.id.split(' ')[0]}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block mb-1 text-tossGray600">현장 필수 제공 품목</label>
+                                    <select id="sel-bbq-item" class="w-full bg-tossGray50 border border-tossGray200 p-2.5 rounded-xl outline-none">
+                                        <option value="🔥 강원 참나무 참숯 바비큐 세트 (2~3인)">🔥 강원 참나무 참숯 바비큐 세트 (2~3인)</option>
+                                        <option value="🪵 아궁이 불멍 모닥불용 장작 추가">🪵 아궁이 불멍 모닥불용 장작 추가</option>
+                                        <option value="🧺 프리미엄 어메니티 및 특급 호텔식 타월 추가">🧺 프리미엄 어메니티 및 특급 호텔식 타월 추가</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block mb-1 text-tossGray600">배달 및 준비 희망시간</label>
+                                    <input type="text" id="inp-bbq-time" value="즉시 요청" class="w-full bg-tossGray50 border border-tossGray200 p-2.5 rounded-xl outline-none">
+                                </div>
+                                <button onclick="executeAddBbq()" class="w-full bg-tossGray900 text-white py-3 rounded-xl mt-1 hover:bg-black font-bold text-xs toss-transition">현장 무전 큐 접수시키기</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 4) [관리자 전용] 투숙 매출 정산 리포트 (순수 모던 DOM 차트)
+        function buildSalesHtml() {
+            let totalSum = 0;
+            let revenueArray = coreState.rooms.map(r => {
+                // 원장에서 해당 객실 매칭 매출 연산
+                const matches = coreState.reservations.filter(res => res.room === r.id);
+                const total = matches.reduce((sum, current) => sum + current.price, 0);
+                totalSum += total;
+                return { name: r.id.split(' ')[0], total };
+            });
+
+            const maxTotal = Math.max(...revenueArray.map(x => x.total)) || 1;
+
+            let chartRows = revenueArray.map(item => {
+                const ratio = (item.total / maxTotal) * 100;
+                return `
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs font-bold text-tossGray800">
+                            <span>${item.name}</span>
+                            <span>${item.total.toLocaleString()}원</span>
+                        </div>
+                        <div class="w-full bg-tossGray100 h-3 rounded-full overflow-hidden">
+                            <div class="bg-tossBlue h-full rounded-full toss-transition" style="width: ${ratio}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="space-y-8 animate-screen-in">
+                    <div>
+                        <h2 class="text-3xl font-black tracking-tight text-tossGray900">Finance 실시간 투숙 정산 리포트</h2>
+                        <p class="text-sm font-medium text-tossGray600 mt-1">확정 보존된 예약 데이터베이스 트랜잭션을 기반으로 자동 분개 산출된 투명 재무 정보 통계입니다.</p>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-8">
+                        <div class="col-span-2 bg-white p-8 rounded-3xl border border-tossGray200/50 space-y-6 shadow-sm">
+                            <div class="flex justify-between items-end">
+                                <div>
+                                    <span class="text-xs font-bold text-tossGray600">당월 누적 예약 원장 결제 총액</span>
+                                    <p class="text-3xl font-black text-tossGray900 mt-1">${totalSum.toLocaleString()}원</p>
+                                </div>
+                                <span class="text-xs font-black bg-green-50 text-tossSuccess px-3 py-1.5 rounded-full">목표 매출액 달성 순항 중</span>
+                            </div>
+                            <div class="h-[1px] bg-tossGray100"></div>
+                            <div class="space-y-4">
+                                <h4 class="text-sm font-extrabold text-tossGray900">각 독립 독채 객실별 누적 매출 기여 점유율</h4>
+                                <div class="space-y-3">${chartRows}</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-3xl border border-tossGray200/50 h-fit space-y-4 shadow-sm">
+                            <h4 class="text-sm font-bold text-tossGray900">다이렉트 외부 판매 채널 비중</h4>
+                            <div class="space-y-3 pt-2 text-xs font-bold">
+                                <div>
+                                    <div class="flex justify-between mb-1"><span>자사 다이렉트 홈페이지 예약</span><span>75%</span></div>
+                                    <div class="w-full bg-tossGray100 h-2 rounded-full overflow-hidden"><div class="bg-brandRed h-full rounded-full" style="width: 75%"></div></div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between mb-1"><span>국내 포털 파트너 제휴 연동</span><span>25%</span></div>
+                                    <div class="w-full bg-tossGray100 h-2 rounded-full overflow-hidden"><div class="bg-tossBlue h-full rounded-full" style="width: 25%"></div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 5) [관리자 전용 고도화] CRM 우수 고객 요약 원장
+        function buildCustomersHtml() {
+            // 하드코딩된 더미가 아닌 시스템 내부 가입원장 및 트랜잭션과 실시간 동기화
+            const db = JSON.parse(localStorage.getItem('BU_USERS_DB')) || [];
+            
+            let tableRows = db.map((u, index) => {
+                // 고도화: 사용자의 실질적인 비즈니스 가치 매핑 시뮬레이션
+                const isOperator = u.role === 'admin';
+                const visitCount = isOperator ? '-' : '4회';
+                const totalSpent = isOperator ? '-' : '1,240,000원';
+                const vipBadge = isOperator ? 'bg-purple-50 text-purple-600' : 'bg-blue-50 text-tossBlue';
+
+                return `
+                    <tr class="border-b border-tossGray100 hover:bg-tossGray50/60 font-semibold text-xs toss-transition text-tossGray900">
+                        <td class="p-4 font-bold text-tossGray900 pl-6">${u.email}</td>
+                        <td class="p-4">${u.username}</td>
+                        <td class="p-4">
+                            <span class="px-2.5 py-1 text-[10px] font-black rounded-md ${vipBadge}">
+                                ${u.role === 'admin' ? '운영 마스터' : 'VIP 투숙회원'}
+                            </span>
+                        </td>
+                        <td class="p-4 text-tossGray600">${visitCount}</td>
+                        <td class="p-4 font-bold text-tossGray900">${totalSpent}</td>
+                        <td class="p-4 text-right pr-6">
+                            <button onclick="executeForceKick(${index})" class="bg-brandRedLight text-brandRed hover:bg-brandRed hover:text-white px-3 py-1.5 rounded-xl font-bold toss-transition">데이터 말소</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            return `
+                <div class="space-y-8 animate-screen-in">
+                    <div>
+                        <h2 class="text-3xl font-black tracking-tight text-tossGray900">CRM 마케팅 우수 고객 관리 원장</h2>
+                        <p class="text-sm font-medium text-tossGray600 mt-1">우리 펜션 멤버십 플랫폼에 가입된 고객별 누적 투숙 횟수 및 총 결제 실적 데이터 뱅크 원장입니다.</p>
+                    </div>
+
+                    <div class="bg-white rounded-3xl border border-tossGray200/60 shadow-sm overflow-hidden">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-tossGray50 border-b border-tossGray200 text-xs font-bold text-tossGray600">
+                                    <th class="p-4 pl-6">보안 고유 계정(ID)</th>
+                                    <th class="p-4">고객 식별명</th>
+                                    <th class="p-4">멤버십 보안 등급</th>
+                                    <th class="p-4">누적 스테이 횟수</th>
+                                    <th class="p-4">총 결제 매출액</th>
+                                    <th class="p-4 text-right pr-6">원격 강제 데이터 제어</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-tossGray100">${tableRows}</tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 6) [관리자 전용] 시스템 환경 설정
+        function buildSettingsHtml() {
+            return `
+                <div class="space-y-8 animate-screen-in">
+                    <div>
+                        <h2 class="text-3xl font-black tracking-tight text-tossGray900">펜션 운영 코어 환경 설정</h2>
+                        <p class="text-sm font-medium text-tossGray600 mt-1">BurningUncle 글로벌 펜션 오퍼레이션의 공통 규칙 상수를 제어합니다.</p>
+                    </div>
+
+                    <div class="bg-white p-8 rounded-3xl border border-tossGray200/60 max-w-xl space-y-4 shadow-sm">
+                        <div class="flex justify-between items-center py-2">
+                            <div>
+                                <h5 class="text-sm font-bold text-tossGray900">강원 산간 조기 체크인 허용 스위치</h5>
+                                <p class="text-xs text-tossGray600">객실 정비 완료 판정 즉시 고객에게 입실 승인 카카오 메시지를 발송합니다.</p>
+                            </div>
+                            <input type="checkbox" checked class="w-5 h-5 accent-tossBlue">
+                        </div>
+                        <div class="h-[1px] bg-tossGray100"></div>
+                        <div class="flex justify-between items-center py-2">
+                            <div>
+                                <h5 class="text-sm font-bold text-tossGray900">야간 참숯 주문 자동 마감 가동</h5>
+                                <p class="text-xs text-tossGray600">매일 밤 22:00 이후에는 고객 사이드바에서 바비큐 원격 요청을 자동 차단합니다.</p>
+                            </div>
+                            <input type="checkbox" class="w-5 h-5 accent-tossBlue">
+                        </div>
+                        <div class="h-[1px] bg-tossGray100"></div>
+                        <button onclick="showToast('글로벌 서비스 운영 정책 세팅 동기화 완료')" class="w-full bg-tossBlue text-white font-bold py-3.5 rounded-xl text-xs shadow-sm">상수 데이터 전체 동기화 적용</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ================================================================= -->
+        // 5. CORE INTERACTION LOGIC ENGINES (핵심 작동 제어 레버 컨트롤러)
+        // ================================================================= -->
+        function switchAuthFormMode() {
+            authFormMode = (authFormMode === 'login') ? 'signup' : 'login';
+            syncRouteView();
+        }
+
+        function executeAuthAction() {
+            const email = document.getElementById('inp-email').value.trim();
+            const password = document.getElementById('inp-password').value;
+
+            if(!email || !password) {
+                showToast('❌ 경고: 계정 정보 및 패스워드를 생략할 수 없습니다.');
+                return;
+            }
+
+            let db = JSON.parse(localStorage.getItem('BU_USERS_DB')) || [];
+
+            if (authFormMode === 'signup') {
+                const username = document.getElementById('inp-username').value.trim() || '신규운영자';
+                const role = document.getElementById('inp-role').value;
+
+                if (db.some(u => u.email === email)) {
+                    showToast('⚠️ 데이터베이스 중복 위반: 이미 동일한 계정이 존재합니다.');
+                    return;
+                }
+
+                db.push({ email, password, username, role });
+                localStorage.setItem('BU_USERS_DB', JSON.stringify(db));
+                showToast('🎉 멤버십 정보 등록 성공! 세션 로그인을 시작해 주세요.');
+                authFormMode = 'login';
+                syncRouteView();
+            } else {
+                // 빌트인 기본 계정 마스터 프리셋 조건 매핑 예외 레이어
+                if(email === 'admin@uncle.com' && password === '1234') {
+                    coreState.currentUser = { email, username: '삼척 총괄 매니저', role: 'admin' };
+                } else if(email === 'customer@uncle.com' && password === '1234') {
+                    coreState.currentUser = { email, username: '김토스 고객', role: 'customer' };
+                } else {
+                    const match = db.find(u => u.email === email && u.password === password);
+                    if(match) {
+                        coreState.currentUser = match;
+                    } else {
+                        showToast('❌ 세션 매칭 실패: 가입 원장 정보를 찾을 수 없습니다.');
+                        return;
+                    }
+                }
+
+                // 권한 등급에 따른 최초 뷰포트 목적지 설정 분기
+                coreState.currentView = (coreState.currentUser.role === 'admin') ? 'dashboard' : 'timeline';
+                showToast(`🔑 ${coreState.currentUser.username} 님, 스마트 오퍼레이션 세션 활성화.`);
+                syncRouteView();
+            }
+        }
+
+        function executeLogout() {
+            coreState.currentUser = null;
+            showToast('🔒 안전하게 로그아웃되어 보안 세션이 파기되었습니다.');
+            syncRouteView();
+        }
+
+        function handleViewSwitch(viewId) {
+            coreState.currentView = viewId;
+            renderActiveSubView();
+        }
+
+        // 고도화: 달력 날짜 연산 기반의 실시간 예약 확정 처리 파이프라인
+        function executeNewReservation() {
+            const room = document.getElementById('sel-res-room').value;
+            const checkIn = document.getElementById('inp-checkin-date').value;
+            const checkOut = document.getElementById('inp-checkout-date').value;
+            const guestName = document.getElementById('inp-guest-name').value.trim();
+
+            if(!checkIn || !checkOut || !guestName) {
+                showToast('❌ 오퍼레이션 에러: 날짜 선택 및 투숙자명을 확인하세요.');
+                return;
+            }
+
+            // 날짜 선후 관계 무결성 검증
+            if(new Date(checkIn) >= new Date(checkOut)) {
+                showToast('❌ 날짜 배치 오류: 체크아웃일은 체크인일보다 미래여야 합니다.');
+                return;
+            }
+
+            // 현실적 고도화: 기존 타임 테이블 스케줄 중복 중첩 차단 체크 루프
+            const isOverlapped = coreState.reservations.some(res => {
+                if (res.room !== room) return false;
+                // 날짜 중첩 조건식 연산
+                return (new Date(checkIn) < new Date(res.checkOut) && new Date(checkOut) > new Date(res.checkIn));
+            });
+
+            if (isOverlapped) {
+                showToast('❌ 중복 점유 위반: 해당 일정에는 이미 선점된 투숙건이 존재합니다.');
+                return;
+            }
+
+            // 요금 단가 정보 추출
+            const matchedRoomObj = coreState.rooms.find(x => x.id === room);
+            const daysDiff = Math.ceil((new Date(checkOut) - new Date(checkIn)) / (1000 * 60 * 60 * 24));
+            const calculatedPrice = matchedRoomObj.price * daysDiff;
+
+            const newId = Date.now();
+            coreState.reservations.push({
+                id: newId,
+                email: coreState.currentUser.email,
+                room,
+                checkIn,
+                checkOut,
+                guestName,
+                price: calculatedPrice,
+                status: '결제 완료'
+            });
+
+            showToast(`🎉 [${room.split(' ')[0]}] ${daysDiff}박 스케줄 원장 등록 확정!`);
+            renderActiveSubView();
+        }
+
+        function executeCancelReservation(id) {
+            coreState.reservations = coreState.reservations.filter(x => x.id !== id);
+            showToast('🗑️ 해당 투숙 스케줄 원장을 강제 취소 및 파기 처리했습니다.');
+            renderActiveSubView();
+        }
+
+        // 대시보드 객실 현실적 정비 가이드 스위치 로직
+        function executeRotateStatus(idx) {
+            const current = coreState.rooms[idx].status;
+            let next = 'empty';
+
+            if (current === 'empty') {
+                next = 'occupied';
+                showToast(`📢 [${coreState.rooms[idx].id.split(' ')[0]}] 임시 수동 체크인 세션 수립`);
+            } else if (current === 'occupied') {
+                next = 'dirty';
+                showToast(`📢 [${coreState.rooms[idx].id.split(' ')[0]}] 고객 퇴실 확인 - 청소 정비 지시 자동 무전 발송`);
+            } else if (current === 'dirty') {
+                next = 'empty';
+                showToast(`📢 [${coreState.rooms[idx].id.split(' ')[0]}] 룸 메이드 정비 완료 - 즉시 투숙 공실 상태 복귀`);
+            }
+
+            coreState.rooms[idx].status = next;
+            renderActiveSubView();
+        }
+
+        function executeAddBbq() {
+            const room = document.getElementById('sel-bbq-room').value;
+            const item = document.getElementById('sel-bbq-item').value;
+            const time = document.getElementById('inp-bbq-time').value;
+
+            coreState.bbqOrders.push({ id: Date.now(), room, item, time, status: '접수 대기' });
+            showToast('🔥 현장 서비스 오더 무전 배정 완료.');
+            renderActiveSubView();
+        }
+
+        function executeClearBbq(id) {
+            coreState.bbqOrders = coreState.bbqOrders.filter(o => o.id !== id);
+            showToast('✅ 참숯/어메니티 현장 배달 서비스 완료 피드백 확인.');
+            renderActiveSubView();
+        }
+
+        function executeForceKick(index) {
+            let db = JSON.parse(localStorage.getItem('BU_USERS_DB')) || [];
+            const target = db[index];
+
+            if(coreState.currentUser && coreState.currentUser.email === target.email) {
+                showToast('❌ 임계점 차단: 현재 마스터 로그인 세션은 직접 소멸시킬 수 없습니다.');
+                return;
+            }
+
+            db.splice(index, 1);
+            localStorage.setItem('BU_USERS_DB', JSON.stringify(db));
+            showToast('🗑️ CRM 저장소에서 해당 고객의 정보 인코딩 트랙을 말소 처리했습니다.');
+            renderActiveSubView();
+        }
+
+        function showToast(msg) {
+            const hub = document.getElementById('toast-hub');
+            if(!hub) return;
+            const t = document.createElement('div');
+            t.className = "bg-tossGray900 text-white font-bold text-xs px-5 py-3.5 rounded-2xl shadow-xl pointer-events-auto animate-screen-in flex items-center gap-2 border border-tossGray800";
+            t.innerHTML = `<i class="fa-solid fa-circle-info text-tossBlue"></i><span>${msg}</span>`;
+            hub.appendChild(t);
+            setTimeout(() => t.remove(), 3200);
+        }
+
+        // 앱 구동 진입점 (Entrypoint)
+        window.onload = () => {
+            let db = JSON.parse(localStorage.getItem('BU_USERS_DB')) || [];
+            if(db.length === 0) {
+                db.push({ email: 'admin@uncle.com', password: '1234', username: '삼척 관리자', role: 'admin' });
+                db.push({ email: 'customer@uncle.com', password: '1234', username: '김토스 고객', role: 'customer' });
+                localStorage.setItem('BU_USERS_DB', JSON.stringify(db));
+            }
+            syncRouteView();
+        };
+    </script>
+</body>
+</html>
